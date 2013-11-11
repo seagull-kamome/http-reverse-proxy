@@ -162,7 +162,7 @@ data WaiProxySettings = WaiProxySettings
     -- Default: SIHFromSocket
     --
     -- Since 0.2.0
-    , wpsProcessBody :: HC.Response () -> Maybe (Conduit ByteString (ResourceT IO) (Flush Builder))
+    , wpsProcessBody :: WAI.Request -> HC.Response () -> Maybe (Conduit ByteString (ResourceT IO) (Flush Builder))
     -- ^ Post-process the response body returned from the host.
     --
     -- Since 0.2.1
@@ -180,7 +180,7 @@ instance Default WaiProxySettings where
         { wpsOnExc = defaultOnExc
         , wpsTimeout = Nothing
         , wpsSetIpHeader = SIHFromSocket
-        , wpsProcessBody = const Nothing
+        , wpsProcessBody = (\_ _ -> Nothing)
         }
 
 waiProxyToSettings getDest wps manager req0 = do
@@ -236,7 +236,7 @@ waiProxyToSettings getDest wps manager req0 = do
                 Right res -> do
                     (src, _) <- unwrapResumable $ HC.responseBody res
                     let conduit =
-                            case wpsProcessBody wps $ fmap (const ()) res of
+                            case wpsProcessBody wps req0 $ fmap (const ()) res of
                                 Nothing -> awaitForever (\bs -> yield (Chunk $ fromByteString bs) >> yield Flush)
                                 Just conduit -> conduit
                     return $ WAI.ResponseSource
